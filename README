@@ -19,7 +19,7 @@ Parameters to change in the javascript file:
 - IMAGE_W: the height of the source images (default: 28)
 - MODEL_INPUT_SIZE: the image size required for the model input (default: 299)
 - GENERATOR_INPUT_SIZE: the input size of the generator to generate images from (default: 100)
-- SAMPLE_SIZE: how many images to use in score calculations (default: 100)
+- SAMPLE_SIZE: how many images to use in score calculations (default: 20)
 
 Author:
 Gustav Holmström

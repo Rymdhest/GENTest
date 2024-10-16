@@ -3,7 +3,7 @@ const IMAGE_W = 28;
 const MODEL_INPUT_SIZE = 299;
 const GENERATOR_INPUT_SIZE = 100;
 const IMAGE_SIZE = IMAGE_H * IMAGE_W;
-const SAMPLE_SIZE = 100 // how many images to use in score calculations
+const SAMPLE_SIZE = 20 // how many images to use in score calculations
 const MNIST_URL = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png';
 
 run();
