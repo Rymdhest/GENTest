@@ -1,0 +1,25 @@
+Description:
+Program to calculate the Fréchet Inception Distance (FID) and Inception Score (IS) of a model.
+The program contains the pre trained InceptionV3 model for evaluation.
+The application also plots both the real images and generated images on the webpage.
+
+How to run:
+1. run "pip install Flask Flask-CORS numpy scipy" to get the required python packages
+2. in this folder run "python pyHelper.py" to start the flask server
+3. Open the 'index.html' file in your web browser.
+4. Wait for the result to load.
+
+Files:
+- index.html: The main HTML file to run the application. 
+- tensorflow.js: The JavaScript file containing the FID and IS implementations.
+- PyHelper.py: Flask server to provide sqrtm() from scipy and covariance() from numpy.
+
+Parameters to change in the javascript file:
+- IMAGE_H: the width of the source images (default: 28)
+- IMAGE_W: the height of the source images (default: 28)
+- MODEL_INPUT_SIZE: the image size required for the model input (default: 299)
+- GENERATOR_INPUT_SIZE: the input size of the generator to generate images from (default: 100)
+- SAMPLE_SIZE: how many images to use in score calculations (default: 100)
+
+Author:
+Gustav Holmström
