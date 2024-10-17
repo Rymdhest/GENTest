@@ -5,6 +5,8 @@ const GENERATOR_INPUT_SIZE = 100;
 const IMAGE_SIZE = IMAGE_H * IMAGE_W;
 const SAMPLE_SIZE = 1000 // how many images to use in score calculations
 const MNIST_URL = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png';
+const BATCH_SIZE = 8;
+
 
 run();
 // Main function to execute generation, FID, and IS calculation
@@ -51,28 +53,28 @@ function createGenerator() {
 async function preprocessImages(inputImages) {
     resizedImages = tf.image.resizeBilinear(inputImages, [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
     rgbImages = tf.concat([resizedImages, resizedImages, resizedImages], 3);
-    resizedImages.dispose()
+    tf.dispose(resizedImages)
     return rgbImages;
 }
 
-
 // Function to calculate FID
 async function calculateFID(realImages, generatedImages, inceptionModel) {
+
     const preprocessedRealImages = await preprocessImages(realImages);
 
-    const realActivations = inceptionModel.predict(preprocessedRealImages);
-    preprocessedRealImages.dispose()
+    const realActivations = inceptionModel.predict(preprocessedRealImages, { batchSize: BATCH_SIZE });
+    tf.dispose(preprocessedRealImages)
 
     const realActivationsArray = await realActivations.array();
-    realActivations.dispose()
+    tf.dispose(realActivations)
 
     const preprocessedGeneratedImages = await preprocessImages(generatedImages);
 
-    const generatedActivations = inceptionModel.predict(preprocessedGeneratedImages);
-    preprocessedGeneratedImages.dispose()
+    const generatedActivations = inceptionModel.predict(preprocessedGeneratedImages, { batchSize: BATCH_SIZE });
+    tf.dispose(preprocessedGeneratedImages)
 
     const generatedActivationsArray = await generatedActivations.array();
-    generatedActivations.dispose()
+    tf.dispose(generatedActivations)
 
     // Calculate mean and covariance
     const mu1 = math.mean(realActivationsArray, 0);
@@ -93,13 +95,13 @@ async function calculateFID(realImages, generatedImages, inceptionModel) {
 
 async function calculateIS(generatedImages, inceptionModel) {
     const preprocessedImages = await preprocessImages(generatedImages);
-    const pYX = inceptionModel.predict(preprocessedImages);
-    preprocessedImages.dispose()
+    const pYX = inceptionModel.predict(preprocessedImages, { batchSize: BATCH_SIZE });
+    tf.dispose(preprocessedImages)
 
     const pY = pYX.mean(0).expandDims(0);
     const klD = pYX.mul(pYX.add(1e-16).log().sub(pY.add(1e-16).log()));
-    pYX.dispose()
-    pY.dispose()
+    tf.dispose(pYX)
+    tf.dispose(pY)
     const isScore = tf.exp(klD.sum(1).mean()).dataSync()[0];
     return isScore;
 }

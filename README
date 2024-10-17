@@ -20,6 +20,7 @@ Parameters to change in the javascript file:
 - MODEL_INPUT_SIZE: the image size required for the model input (default: 299)
 - GENERATOR_INPUT_SIZE: the input size of the generator to generate images from (default: 100)
 - SAMPLE_SIZE: how many images to use in score calculations (default: 1000)
+- BATCH_SIZE: how big the predict batches should be. (default: 8)
 
 Author:
 Gustav Holmström
