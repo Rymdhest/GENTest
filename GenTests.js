@@ -3,7 +3,7 @@ const IMAGE_W = 28;
 const MODEL_INPUT_SIZE = 299;
 const GENERATOR_INPUT_SIZE = 100;
 const IMAGE_SIZE = IMAGE_H * IMAGE_W;
-const SAMPLE_SIZE = 20 // how many images to use in score calculations
+const SAMPLE_SIZE = 1000 // how many images to use in score calculations
 const MNIST_URL = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png';
 
 run();
@@ -11,13 +11,13 @@ run();
 async function run() {
     const generator = createGenerator();
     const model = await tf.loadLayersModel('http://localhost:5000/static/InceptionV3/model.json');
-  
+
     // Generate images
     const noise = tf.randomNormal([SAMPLE_SIZE, GENERATOR_INPUT_SIZE]);
     const generatedImages = generator.predict(noise, { training: false });
     realImages = await loadMnistData()
-    
-  // Calculate FID and IS
+
+    // Calculate FID and IS
     const fid = await calculateFID(realImages.slice(0, SAMPLE_SIZE), generatedImages, model);
     const isScore = await calculateIS(generatedImages, model);
 
@@ -28,45 +28,51 @@ async function run() {
 
     document.getElementById('FID').textContent = `FID Score: ${fid}`;
     document.getElementById('IS').textContent = `Inception Score: ${isScore}`;
-  }
+}
 
 // Define a simple generator
 function createGenerator() {
     const model = tf.sequential();
-    model.add(tf.layers.dense({units: 7 * 7 * 256, useBias: false, inputShape: [GENERATOR_INPUT_SIZE], kernelInitializer: 'randomNormal'}));
+    model.add(tf.layers.dense({ units: 7 * 7 * 256, useBias: false, inputShape: [GENERATOR_INPUT_SIZE], kernelInitializer: 'randomNormal' }));
     model.add(tf.layers.batchNormalization());
     model.add(tf.layers.leakyReLU());
     model.add(tf.layers.reshape({ targetShape: [7, 7, 256] }));
-    model.add(tf.layers.conv2dTranspose({filters: 128, kernelSize: 5, strides: [1, 1], padding: 'same', useBias: false, kernelInitializer: 'randomNormal'}));
+    model.add(tf.layers.conv2dTranspose({ filters: 128, kernelSize: 5, strides: [1, 1], padding: 'same', useBias: false, kernelInitializer: 'randomNormal' }));
     model.add(tf.layers.batchNormalization());
     model.add(tf.layers.leakyReLU());
-    model.add(tf.layers.conv2dTranspose({filters: 64, kernelSize: 5, strides: [2, 2], padding: 'same', useBias: false, kernelInitializer: 'randomNormal'}));
+    model.add(tf.layers.conv2dTranspose({ filters: 64, kernelSize: 5, strides: [2, 2], padding: 'same', useBias: false, kernelInitializer: 'randomNormal' }));
     model.add(tf.layers.batchNormalization());
     model.add(tf.layers.leakyReLU());
-    model.add(tf.layers.conv2dTranspose({filters: 1, kernelSize: 5, strides: [2, 2], padding: 'same', useBias: false, activation: 'tanh', kernelInitializer: 'randomNormal'}));
+    model.add(tf.layers.conv2dTranspose({ filters: 1, kernelSize: 5, strides: [2, 2], padding: 'same', useBias: false, activation: 'tanh', kernelInitializer: 'randomNormal' }));
     return model;
-  }
+}
 
 // Resize and convert from grayscale to RGB
-async function preprocessImages(images) {
-        images = tf.image.resizeBilinear(images, [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
-        images = tf.concat([images, images, images], 3);
-        return images; 
-  }
+async function preprocessImages(inputImages) {
+    resizedImages = tf.image.resizeBilinear(inputImages, [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
+    rgbImages = tf.concat([resizedImages, resizedImages, resizedImages], 3);
+    resizedImages.dispose()
+    return rgbImages;
+}
+
 
 // Function to calculate FID
 async function calculateFID(realImages, generatedImages, inceptionModel) {
-    // Preprocess images
-    const preprocessedRealImages =await  preprocessImages(realImages);
+    const preprocessedRealImages = await preprocessImages(realImages);
+
+    const realActivations = inceptionModel.predict(preprocessedRealImages);
+    preprocessedRealImages.dispose()
+
+    const realActivationsArray = await realActivations.array();
+    realActivations.dispose()
+
     const preprocessedGeneratedImages = await preprocessImages(generatedImages);
 
-    // Calculate activations
-    const realActivations = inceptionModel.predict(preprocessedRealImages);
     const generatedActivations = inceptionModel.predict(preprocessedGeneratedImages);
+    preprocessedGeneratedImages.dispose()
 
-    // Get the activations data as arrays
-    const realActivationsArray = await realActivations.array();
     const generatedActivationsArray = await generatedActivations.array();
+    generatedActivations.dispose()
 
     // Calculate mean and covariance
     const mu1 = math.mean(realActivationsArray, 0);
@@ -78,21 +84,23 @@ async function calculateFID(realImages, generatedImages, inceptionModel) {
     const ssdiff = math.sum(math.map(math.subtract(mu1, mu2), (value) => math.square(value)));
 
     // Calculate sqrt of product between covariances
-    const covmean =await calculateRemote(math.multiply(sigma1, sigma2), 'sqrtm');
+    const covmean = await calculateRemote(math.multiply(sigma1, sigma2), 'sqrtm');
 
     // Calculate FID
     const fid = ssdiff + math.trace(tf.add(sigma1, sigma2).sub(tf.mul(covmean, 2)).arraySync());
     return fid;
 }
-  
+
 async function calculateIS(generatedImages, inceptionModel) {
     const preprocessedImages = await preprocessImages(generatedImages);
     const pYX = inceptionModel.predict(preprocessedImages);
+    preprocessedImages.dispose()
 
     const pY = pYX.mean(0).expandDims(0);
     const klD = pYX.mul(pYX.add(1e-16).log().sub(pY.add(1e-16).log()));
+    pYX.dispose()
+    pY.dispose()
     const isScore = tf.exp(klD.sum(1).mean()).dataSync()[0];
-
     return isScore;
 }
 
@@ -121,7 +129,7 @@ async function loadMnistData() {
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
                 for (let j = 0; j < imageData.data.length / 4; j++) {
-                    datasetBytesView[j] = (imageData.data[j * 4] / 255)*2-1; // map from 0,255 to -1,1
+                    datasetBytesView[j] = (imageData.data[j * 4] / 255) * 2 - 1; // map from 0,255 to -1,1
                 }
             }
             resolve(new Float32Array(datasetBytesBuffer));
@@ -137,8 +145,8 @@ async function loadMnistData() {
     return x_train;
 }
 
-  // Function to display images
-  function plotImages(images, title, numImages = 10) {
+// Function to display images
+function plotImages(images, title, numImages = 10) {
     const container = document.getElementById('imageContainer');
     const originalTitle = document.createElement('div');
     originalTitle.className = 'image-title';
@@ -166,13 +174,13 @@ async function loadMnistData() {
 
 // helper function to use certain functions from a local python server
 async function calculateRemote(input, route) {
-    const data = { 
-        data: 
-        input
+    const data = {
+        data:
+            input
     };
-    
+
     try {
-        const response = await fetch('http://localhost:5000/'+route, {  // Use absolute URL
+        const response = await fetch('http://localhost:5000/' + route, {  // Use absolute URL
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -181,7 +189,7 @@ async function calculateRemote(input, route) {
         });
 
         const result = await response.json();
-        
+
         if (response.ok) {
             return result.result;  // Return the result matrix
         } else {
